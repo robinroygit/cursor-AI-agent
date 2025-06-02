@@ -1,0 +1,1 @@
+The Weather in delhi is Haze +34°C
