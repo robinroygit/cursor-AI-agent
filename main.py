@@ -14,6 +14,7 @@ client = OpenAI()
 
 def run_command(cmd: str):
     result = os.system(cmd)
+    print(f"Command executed: {cmd}")
     return f"Command executed: {cmd}"
 
 def get_weather(city: str):
@@ -23,64 +24,70 @@ def get_weather(city: str):
         return f"The Weather in {city} is {response.text}"
     return "Something went wrong fetching weather."
 
-def build_todo_app(_: str = ""):
-    project_name = "todo-app"
+def build_todo_app(_=None):
+    app_name = "vite-todo-app"
+    template = "react"
 
-    # Remove if folder exists
-    if os.path.exists(project_name):
-        shutil.rmtree(project_name)
+    # Remove existing folder if exists
+    if os.path.exists(app_name):
+        shutil.rmtree(app_name)
 
-    # Create Vite + React app
-    subprocess.run(f"npm create vite@latest {project_name} -- --template react", shell=True)
+    try:
+        # Create Vite app with React template
+        subprocess.run(
+            ["npm", "create", "vite@latest", app_name, "--", "--template", template],
+            check=True
+        )
 
-    # Install dependencies
-    subprocess.run(f"cd {project_name} && npm install", shell=True)
+        # Install dependencies
+        subprocess.run(["npm", "install"], cwd=app_name, check=True)
 
-    # Basic Todo App code
-    app_code = '''
-import { useState } from 'react';
-import './App.css';
+        # Optional: Write basic Todo component to src/App.jsx
+        todo_component = """
+            import { useState } from 'react';
+            import './App.css';
 
-function App() {
-  const [todos, setTodos] = useState([]);
-  const [input, setInput] = useState("");
+            function App() {
+              const [todos, setTodos] = useState([]);
+              const [input, setInput] = useState("");
 
-  const addTodo = () => {
-    if (!input) return;
-    setTodos([...todos, input]);
-    setInput("");
-  };
+              const addTodo = () => {
+                if (!input) return;
+                setTodos([...todos, input]);
+                setInput("");
+              };
 
-  return (
-    <div className="App">
-      <h1>Todo App</h1>
-      <input value={input} onChange={(e) => setInput(e.target.value)} />
-      <button onClick={addTodo}>Add</button>
-      <ul>
-        {todos.map((todo, idx) => (
-          <li key={idx}>{todo}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+              return (
+                <div style={{ padding: 20 }}>
+                  <h1>Todo App</h1>
+                  <input value={input} onChange={e => setInput(e.target.value)} />
+                  <button onClick={addTodo}>Add</button>
+                  <ul>
+                    {todos.map((todo, index) => <li key={index}>{todo}</li>)}
+                  </ul>
+                </div>
+              );
+            }
 
-export default App;
-'''
+            export default App;
+            """
+        with open(os.path.join(app_name, "src", "App.jsx"), "w") as f:
+            f.write(todo_component)
 
-    app_path = os.path.join(project_name, "src", "App.jsx")
-    with open(app_path, "w") as f:
-        f.write(app_code)
-
-    return f"Todo app created successfully in ./{project_name} folder."
+        return f"Todo app created successfully in ./{app_name}"
+    
+    except subprocess.CalledProcessError as e:
+        return f"Error during creation: {e}"
 
 
 # Available tools
 available_tools = {
     "get_weather": get_weather,
     "run_command": run_command,
-    "build_todo_app": build_todo_app
+    "build_todo_app": build_todo_app,
+
 }
+
 
 # System prompt
 SYSTEM_PROMPT = f"""
@@ -128,12 +135,21 @@ Output:{{"step":"observe", "output": "weather.txt"}}
 Output:{{"step":"output", "content": "weather.txt file has been created"}}
 
 Example:
-User Query: build todo app
-Output:{{"step":"plan", "content": "The user wants to build a todo app."}}
-Output:{{"step":"plan", "content": "From the available tools I should call build_todo_app."}}
-Output:{{"step":"action", "function": "build_todo_app", "input": ""}}
-Output:{{"step":"observe", "output": "Todo app created successfully in ./todo-app folder."}}
-Output:{{"step":"output", "content": "The Todo App has been created successfully in the todo-app directory."}}
+User Query: Create a todo app
+Output: {{"step":"plan", "content": "User wants a new todo app project"}}
+Output: {{"step":"plan", "content": "Call build_todo_app tool to scaffold project with working app"}}
+Output: {{"step":"action", "function": "build_todo_app", "input": ""}}
+Output: {{"step":"observe", "output": "Todo Vite project 'todo-app' created"}}
+Output: {{"step":"output", "content": "Todo app initialized using Vite and has working code."}}
+
+Example:
+User Query: add a delete button
+Output: {{"step":"plan", "content": "User wants to add a delete button"}}
+Output: {{"step":"plan", "content": "first get the content from the file and modify the code 'modified_code"}}
+Output: {{"step":"plan", "content": "From the available tools I should call run_command"}}
+Output: {{"step":"action", "function": "run_command", "input":"cd vite-todo-app/src && echo 'modified_code' > App.jsx"}}
+Output: {{"step":"observe", "output": "App.jsx is modified"}}
+Output: {{"step":"output", "content": "App.jsx updated with added delete button and has working code."}}
 
 Today Date is {datetime.now()}
 """
